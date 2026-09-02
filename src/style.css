@@ -465,6 +465,173 @@ ul {
   pointer-events: none;
 }
 
+.wa-greet {
+  width: min(28rem, calc(100% - 1.5rem));
+  max-height: calc(100% - 1.5rem);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--paper);
+}
+
+.wa-greet::backdrop {
+  background: rgba(18, 16, 13, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.wa-greet[open] {
+  display: flex;
+}
+
+.wa-greet-chrome {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 100%;
+  max-height: min(42rem, calc(100dvh - 1.5rem));
+  background: #161310;
+  border: 1px solid rgba(247, 242, 234, 0.12);
+  animation: plan-rise 0.5s var(--ease);
+}
+
+.wa-greet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem 0.85rem;
+}
+
+.wa-greet-head h2 {
+  color: #f7f2ea;
+  font-size: clamp(1.45rem, 3vw, 1.85rem);
+}
+
+.wa-greet-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 8.5rem;
+  padding: 0.35rem 1.25rem 1rem;
+  overflow: auto;
+}
+
+.wa-bubble {
+  max-width: 88%;
+  margin: 0;
+  padding: 0.72rem 0.95rem;
+  font-size: 0.96rem;
+  line-height: 1.45;
+  font-weight: 300;
+  animation: plan-rise 0.4s var(--ease);
+}
+
+.wa-bubble-bot {
+  align-self: flex-start;
+  background: #2a241c;
+  color: #f7f2ea;
+  border: 1px solid rgba(247, 242, 234, 0.08);
+}
+
+.wa-bubble-user {
+  align-self: flex-end;
+  background: var(--gold);
+  color: #fff;
+}
+
+.wa-typing {
+  display: inline-flex;
+  gap: 0.28rem;
+  padding: 0.9rem 1.05rem;
+}
+
+.wa-typing span {
+  width: 0.34rem;
+  height: 0.34rem;
+  border-radius: 50%;
+  background: var(--gold-bright);
+  animation: wa-dot 1s ease-in-out infinite;
+}
+
+.wa-typing span:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.wa-typing span:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+@keyframes wa-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.wa-greet-foot {
+  border-top: 1px solid rgba(247, 242, 234, 0.1);
+  min-height: 3.4rem;
+}
+
+.wa-greet-choices,
+.wa-greet-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.95rem 1.25rem 1.2rem;
+}
+
+.wa-choice {
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(247, 242, 234, 0.22);
+  background: transparent;
+  color: #f7f2ea;
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.wa-choice:hover,
+.wa-choice:focus-visible {
+  border-color: var(--gold);
+  color: var(--gold-bright);
+  outline: none;
+}
+
+.wa-greet-cta {
+  align-items: center;
+}
+
+.wa-greet-cta .btn {
+  min-height: 2.7rem;
+  padding: 0.5rem 1.15rem;
+  font-size: 0.74rem;
+}
+
+.wa-stay {
+  padding: 0.5rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: rgba(247, 242, 234, 0.55);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.wa-stay:hover,
+.wa-stay:focus-visible {
+  color: #f7f2ea;
+  outline: none;
+}
+
 .site-header {
   position: fixed;
   inset: 0 0 auto;
@@ -1014,11 +1181,13 @@ body.nav-open .nav-toggle span:last-child {
   font-size: 0.74rem;
 }
 
-body:has(.plan-viewer[open]) {
+body:has(.plan-viewer[open]),
+body:has(.wa-greet[open]) {
   overflow: hidden;
 }
 
-body:has(.plan-viewer[open]) .wa-float {
+body:has(.plan-viewer[open]) .wa-float,
+body:has(.wa-greet[open]) .wa-float {
   opacity: 0;
   pointer-events: none;
 }

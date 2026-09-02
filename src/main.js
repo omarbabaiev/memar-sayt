@@ -99,7 +99,7 @@ const counterEl = document.querySelector("#viewer-counter");
 const waEl = document.querySelector("#viewer-wa");
 const prevBtn = document.querySelector(".viewer-prev");
 const nextBtn = document.querySelector(".viewer-next");
-const closeBtn = document.querySelector(".viewer-close");
+const closeBtn = document.querySelector("#plan-viewer .viewer-close");
 const stage = document.querySelector("#viewer-stage");
 
 let activePlan = null;
@@ -250,4 +250,232 @@ if (stage) {
     if (dx > 56) goTo(pageIndex - 1, -1);
     if (dx < -56) goTo(pageIndex + 1, 1);
   });
+}
+
+const WA_PHONE = "994500000000";
+const GREET_KEY = "memar-greet";
+const greet = document.querySelector("#wa-greet");
+const greetThread = document.querySelector("#wa-greet-thread");
+const greetFoot = document.querySelector("#wa-greet-foot");
+const greetClose = document.querySelector(".wa-greet-close");
+
+const greetSteps = [
+  {
+    bot: "Salam. Nə üçün eskiz lazımdır?",
+    key: "need",
+    choices: [
+      { label: "Kupça / çıxarış", value: "kupça (çıxarış)" },
+      { label: "Yeni ev", value: "yeni ev — məlumatlandırma" },
+      { label: "Tikinti icazəsi", value: "tikinti icazəsi" },
+      { label: "3D / fasad", value: "3D və fasad" },
+      { label: "Hələ baxıram", value: "ümumi məlumat" },
+    ],
+  },
+  {
+    bot: "Sahə haradadır?",
+    key: "place",
+    choices: [
+      { label: "Bakı", value: "Bakı" },
+      { label: "Masazır / Mehdiabad", value: "Masazır / Mehdiabad" },
+      { label: "Binə / Hövsan", value: "Binə / Hövsan" },
+      { label: "Mərdəkan / Şüvəlan", value: "Mərdəkan / Şüvəlan" },
+      { label: "Başqa", value: "başqa rayon" },
+    ],
+  },
+  {
+    bot: "Təxmini sahə?",
+    key: "size",
+    choices: [
+      { label: "100 m²-ə qədər", value: "100 m²-ə qədər" },
+      { label: "100–200 m²", value: "100–200 m²" },
+      { label: "200–350 m²", value: "200–350 m²" },
+      { label: "350+ m²", value: "350 m²-dən böyük" },
+      { label: "Dəqiq bilmirəm", value: "dəqiq bilinmir" },
+    ],
+  },
+];
+
+const greetStorage = {
+  get() {
+    try {
+      return sessionStorage.getItem(GREET_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set(value) {
+    try {
+      sessionStorage.setItem(GREET_KEY, value);
+    } catch {
+      /* private mode */
+    }
+  },
+};
+
+const greetWait = (ms) =>
+  new Promise((resolve) => setTimeout(resolve, reduceMotion ? 0 : ms));
+
+let greetAlive = false;
+const answers = {};
+
+const scrollGreet = () => {
+  if (!greetThread) return;
+  greetThread.scrollTop = greetThread.scrollHeight;
+};
+
+const addBubble = (role, text) => {
+  if (!greetThread) return;
+  const p = document.createElement("p");
+  p.className = `wa-bubble wa-bubble-${role}`;
+  p.textContent = text;
+  greetThread.appendChild(p);
+  scrollGreet();
+  return p;
+};
+
+const addTyping = () => {
+  if (!greetThread) return null;
+  const el = document.createElement("p");
+  el.className = "wa-bubble wa-bubble-bot wa-typing";
+  el.setAttribute("aria-hidden", "true");
+  el.innerHTML = "<span></span><span></span><span></span>";
+  greetThread.appendChild(el);
+  scrollGreet();
+  return el;
+};
+
+const speak = async (text) => {
+  const typing = addTyping();
+  await greetWait(480);
+  if (!greetAlive) return;
+  typing?.remove();
+  addBubble("bot", text);
+};
+
+const renderChoices = (choices) => {
+  if (!greetFoot) return;
+  greetFoot.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "wa-greet-choices";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Cavab seçimləri");
+  choices.forEach((choice, index) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "wa-choice";
+    btn.textContent = choice.label;
+    btn.dataset.value = choice.value;
+    btn.dataset.label = choice.label;
+    wrap.appendChild(btn);
+    if (index === 0) {
+      requestAnimationFrame(() => btn.focus());
+    }
+  });
+  greetFoot.appendChild(wrap);
+};
+
+const renderCta = () => {
+  if (!greetFoot) return;
+  const text = `Salam. Eskiz: ${answers.need}. Sahə: ${answers.place}. Ölçü: ${answers.size}.`;
+  const href = `https://wa.me/${WA_PHONE}?text=${encodeURIComponent(text)}`;
+  greetFoot.innerHTML = `
+    <div class="wa-greet-cta">
+      <a class="btn btn-gold" href="${href}" target="_blank" rel="noopener noreferrer" data-greet-wa>
+        WhatsApp-a yazın
+      </a>
+      <button class="wa-stay" type="button">Saytda qalın</button>
+    </div>
+  `;
+  greetFoot.querySelector("[data-greet-wa]")?.focus();
+};
+
+const askStep = async (index) => {
+  if (!greetAlive) return;
+  const step = greetSteps[index];
+  await speak(step.bot);
+  if (!greetAlive) return;
+  renderChoices(step.choices);
+};
+
+const finishGreet = async () => {
+  if (!greetAlive) return;
+  await speak("Mesaj hazırdır. Göndərin — qiyməti WhatsApp-da dəqiqləşdirək.");
+  if (!greetAlive) return;
+  renderCta();
+};
+
+const closeGreet = (reason = "dismissed") => {
+  greetAlive = false;
+  greetStorage.set(reason);
+  if (!greet?.open) return;
+  window.setTimeout(() => {
+    if (greet.open) greet.close();
+  }, 140);
+};
+
+const startGreet = async () => {
+  if (!greet || typeof greet.showModal !== "function" || greet.open) return;
+  greetAlive = true;
+  Object.keys(answers).forEach((key) => delete answers[key]);
+  greetThread.innerHTML = "";
+  greetFoot.innerHTML = "";
+  greet.showModal();
+  await askStep(0);
+};
+
+greetFoot?.addEventListener("click", async (event) => {
+  const stay = event.target.closest(".wa-stay");
+  if (stay) {
+    event.preventDefault();
+    closeGreet("dismissed");
+    return;
+  }
+
+  const wa = event.target.closest("[data-greet-wa]");
+  if (wa) {
+    closeGreet("sent");
+    return;
+  }
+
+  const choice = event.target.closest(".wa-choice");
+  if (!choice || !greetAlive) return;
+
+  const answered = greetSteps.find((step) => !(step.key in answers));
+  if (!answered) return;
+
+  answers[answered.key] = choice.dataset.value;
+  greetFoot.innerHTML = "";
+  addBubble("user", choice.dataset.label);
+
+  const nextIndex = greetSteps.findIndex((step) => !(step.key in answers));
+  if (nextIndex === -1) {
+    await finishGreet();
+    return;
+  }
+  await greetWait(220);
+  await askStep(nextIndex);
+});
+
+greetClose?.addEventListener("click", () => closeGreet("dismissed"));
+
+greet?.addEventListener("click", (event) => {
+  if (event.target === greet) closeGreet("dismissed");
+});
+
+greet?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeGreet("dismissed");
+});
+
+const shouldOpenGreet = () => {
+  if (greetStorage.get()) return false;
+  const hash = window.location.hash;
+  if (hash && hash !== "#" && hash !== "#esas") return false;
+  return true;
+};
+
+if (shouldOpenGreet()) {
+  window.setTimeout(() => {
+    if (shouldOpenGreet() && !viewer?.open) startGreet();
+  }, reduceMotion ? 200 : 1100);
 }
