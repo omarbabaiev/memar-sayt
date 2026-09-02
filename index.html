@@ -2,7 +2,7 @@
 <html lang="az">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="Bakıda lisenziyalı eskiz layihə: kupça, məlumatlandırma icraatı və tikinti icazəsi üçün möhürlü çertyojlar. 3D fasad və müəllif nəzarəti."
@@ -400,10 +400,14 @@
             <p class="eyebrow" id="viewer-kicker"></p>
             <h2 id="viewer-title"></h2>
           </div>
-          <button class="viewer-close" type="button" aria-label="Bağla">
-            <span></span>
-            <span></span>
-          </button>
+          <div class="viewer-tools">
+            <button class="viewer-zoom-btn" type="button" data-zoom="-1" aria-label="Kiçilt">−</button>
+            <button class="viewer-zoom-btn" type="button" data-zoom="1" aria-label="Böyüt">+</button>
+            <button class="viewer-close" type="button" aria-label="Bağla">
+              <span></span>
+              <span></span>
+            </button>
+          </div>
         </header>
 
         <div class="viewer-body">
@@ -414,8 +418,10 @@
                 <path d="M15 5 8 12l7 7" stroke="currentColor" stroke-width="1.6" />
               </svg>
             </button>
-            <div class="viewer-paper">
-              <div class="viewer-sheet" id="viewer-sheet"></div>
+            <div class="viewer-paper" id="viewer-paper">
+              <div class="viewer-zoom" id="viewer-zoom">
+                <div class="viewer-sheet" id="viewer-sheet"></div>
+              </div>
             </div>
             <button class="viewer-nav viewer-next" type="button" aria-label="Növbəti vərəq">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">

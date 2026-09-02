@@ -100,12 +100,58 @@ const waEl = document.querySelector("#viewer-wa");
 const prevBtn = document.querySelector(".viewer-prev");
 const nextBtn = document.querySelector(".viewer-next");
 const closeBtn = document.querySelector("#plan-viewer .viewer-close");
-const stage = document.querySelector("#viewer-stage");
+const paper = document.querySelector("#viewer-paper");
+const zoomLayer = document.querySelector("#viewer-zoom");
 
 let activePlan = null;
 let pageIndex = 0;
 let animating = false;
 let lastTrigger = null;
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3.8;
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+const pointers = new Map();
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+let lastTapAt = 0;
+
+const applyZoom = () => {
+  if (!zoomLayer || !paper) return;
+  const rect = paper.getBoundingClientRect();
+  const extraX = Math.max(0, (rect.width * zoom - rect.width) / 2);
+  const extraY = Math.max(0, (rect.height * zoom - rect.height) / 2);
+  panX = Math.max(-extraX, Math.min(extraX, panX));
+  panY = Math.max(-extraY, Math.min(extraY, panY));
+  zoomLayer.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${zoom})`;
+  paper.classList.toggle("is-zoomed", zoom > 1.02);
+};
+
+const resetZoom = () => {
+  zoom = 1;
+  panX = 0;
+  panY = 0;
+  applyZoom();
+};
+
+const setZoom = (next, clientX, clientY) => {
+  const prev = zoom || 1;
+  zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+  if (zoom <= MIN_ZOOM) {
+    panX = 0;
+    panY = 0;
+  } else if (clientX != null && paper) {
+    const rect = paper.getBoundingClientRect();
+    const px = clientX - rect.left - rect.width / 2;
+    const py = clientY - rect.top - rect.height / 2;
+    const ratio = zoom / prev;
+    panX = px - (px - panX) * ratio;
+    panY = py - (py - panY) * ratio;
+  }
+  applyZoom();
+};
 
 const renderThumbs = () => {
   if (!thumbsEl || !activePlan) return;
@@ -156,6 +202,7 @@ const paintSheet = (direction = 0) => {
     sheetEl.innerHTML = page.svg;
     sheetEl.classList.remove("is-out");
     sheetEl.classList.add("is-in");
+    resetZoom();
     updateMeta();
     return;
   }
@@ -176,6 +223,7 @@ const paintSheet = (direction = 0) => {
       animating = false;
     });
     updateMeta();
+    resetZoom();
   }, 220);
 };
 
@@ -203,6 +251,7 @@ const openPlan = (id, trigger) => {
 };
 
 const closeViewer = () => {
+  resetZoom();
   viewer?.close();
   lastTrigger?.focus();
 };
@@ -216,6 +265,13 @@ grid?.addEventListener("click", (event) => {
 prevBtn?.addEventListener("click", () => goTo(pageIndex - 1, -1));
 nextBtn?.addEventListener("click", () => goTo(pageIndex + 1, 1));
 closeBtn?.addEventListener("click", closeViewer);
+
+document.querySelectorAll("#plan-viewer [data-zoom]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const dir = Number(btn.dataset.zoom);
+    setZoom(zoom + dir * 0.45);
+  });
+});
 
 thumbsEl?.addEventListener("click", (event) => {
   const thumb = event.target.closest("[data-page]");
@@ -231,25 +287,90 @@ window.addEventListener("keydown", (event) => {
   if (viewer?.open) {
     if (event.key === "ArrowRight") goTo(pageIndex + 1, 1);
     if (event.key === "ArrowLeft") goTo(pageIndex - 1, -1);
+    if (event.key === "+" || event.key === "=") setZoom(zoom + 0.45);
+    if (event.key === "-" || event.key === "_") setZoom(zoom - 0.45);
+    if (event.key === "0") resetZoom();
     return;
   }
   if (event.key === "Escape") setNav(false);
 });
 
-if (stage) {
-  let startX = 0;
-  stage.addEventListener(
-    "pointerdown",
-    (event) => {
-      startX = event.clientX;
-    },
-    { passive: true },
-  );
-  stage.addEventListener("pointerup", (event) => {
-    const dx = event.clientX - startX;
-    if (dx > 56) goTo(pageIndex - 1, -1);
-    if (dx < -56) goTo(pageIndex + 1, 1);
+if (paper) {
+  paper.addEventListener("pointerdown", (event) => {
+    paper.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y);
+      pinchStartZoom = zoom;
+    }
   });
+
+  paper.addEventListener("pointermove", (event) => {
+    if (!pointers.has(event.pointerId)) return;
+    const prev = pointers.get(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchStartDist) {
+        setZoom(
+          pinchStartZoom * (dist / pinchStartDist),
+          (a.x + b.x) / 2,
+          (a.y + b.y) / 2,
+        );
+      }
+      return;
+    }
+
+    if (zoom > 1.02) {
+      panX += event.clientX - prev.x;
+      panY += event.clientY - prev.y;
+      applyZoom();
+    }
+  });
+
+  const endPointer = (event) => {
+    const start = pointers.get(event.pointerId);
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) pinchStartDist = 0;
+    if (!start) return;
+
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const dist = Math.hypot(dx, dy);
+    const now = Date.now();
+
+    if (dist < 12) {
+      if (now - lastTapAt < 320) {
+        if (zoom > 1.08) resetZoom();
+        else setZoom(2.4, event.clientX, event.clientY);
+        lastTapAt = 0;
+        return;
+      }
+      lastTapAt = now;
+      return;
+    }
+
+    if (zoom <= 1.02 && Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 0) goTo(pageIndex - 1, -1);
+      else goTo(pageIndex + 1, 1);
+    }
+  };
+
+  paper.addEventListener("pointerup", endPointer);
+  paper.addEventListener("pointercancel", endPointer);
+
+  paper.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const step = event.deltaY > 0 ? -0.2 : 0.2;
+      setZoom(zoom + step, event.clientX, event.clientY);
+    },
+    { passive: false },
+  );
 }
 
 const WA_PHONE = "994500000000";
@@ -318,6 +439,53 @@ const greetWait = (ms) =>
 let greetAlive = false;
 const answers = {};
 
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+const ensureAudio = () => {
+  if (!AudioCtx || reduceMotion) return null;
+  try {
+    audioCtx = audioCtx || new AudioCtx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  } catch {
+    return null;
+  }
+};
+
+const playMessageSound = (kind = "in") => {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.value = 0.07;
+  master.connect(ctx.destination);
+
+  const tone = (freq, start, dur) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, now + start);
+    gain.gain.exponentialRampToValueAtTime(1, now + start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(now + start);
+    osc.stop(now + start + dur + 0.02);
+  };
+
+  if (kind === "out") {
+    tone(620, 0, 0.07);
+    tone(880, 0.05, 0.1);
+  } else {
+    tone(740, 0, 0.08);
+    tone(520, 0.045, 0.11);
+  }
+};
+
+window.addEventListener("pointerdown", ensureAudio, { once: true, passive: true });
+
 const scrollGreet = () => {
   if (!greetThread) return;
   greetThread.scrollTop = greetThread.scrollHeight;
@@ -329,6 +497,7 @@ const addBubble = (role, text) => {
   p.className = `wa-bubble wa-bubble-${role}`;
   p.textContent = text;
   greetThread.appendChild(p);
+  playMessageSound(role === "user" ? "out" : "in");
   scrollGreet();
   return p;
 };
